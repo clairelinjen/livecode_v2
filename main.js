@@ -2,11 +2,8 @@ var livecode;       // textarea
 var playbutton;
 var stopbutton;
 var errorbox;
-var score = [];     // arr of ReadLine objects
 var loops = {};
-var activeKeys = [];
 var beat = 1.5;
-var on = false;
 
 function midiToFreq(m) {
     return Math.pow(2, (m - 69) / 12) * 440;
@@ -17,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function(event) {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     livecode = document.getElementById("livecode");
     playbutton = document.getElementById("play");
-    playbutton.addEventListener("click", change);
+    playbutton.addEventListener("click", updateScore);
     stopbutton = document.getElementById("stop");
     stopbutton.addEventListener("click", stopPlaying);
     errorbox = document.getElementById("er");
@@ -33,6 +30,8 @@ document.addEventListener("DOMContentLoaded", function(event) {
             this.gain = audioCtx.createGain();
             this.nextNote = 0;
             this.lastNoteEnd = 0;
+            this.delete = false;
+            this.newNotes = []
             this.setUp();
         }
 
@@ -44,26 +43,35 @@ document.addEventListener("DOMContentLoaded", function(event) {
     }
 
     function updateScore(){
-        score = [];
         errorbox.innerHTML = "";
         var lines = livecode.value.split("\n");
-        var keys = {};
+        var newLoops = {}
         for(let i = 0; i < lines.length; i++){
             if (lines[i].replace(/\s/g, '').length) {
                 var l = new ReadLine(lines[i]); // in readline.js
                 if (l.errors.length>0){
                     error(l.errors, i+1);
                 }
-                else if (l.key in keys){
+                else if (l.key in newLoops){
                     error(["Duplicate key \'"+l.key+"\'",], i+1);
                 }
                 else{
-                    score.push(l);
-                    keys[l.key] = true;
+                    newLoops[l.key] = new Loop(l)
                 }
             }
         }
-        console.log(score);
+        for (var k in loops){
+            if (k in newLoops){
+                loops[k].newNotes = newLoops[k].notes
+                delete newLoops[k]
+            }
+            else{
+                loops[k].delete = true;
+            }
+        }
+        for (var k in newLoops){
+            loops[k] = newLoops[k]
+        }
     }
 
     function error(arr, l){
@@ -73,40 +81,20 @@ document.addEventListener("DOMContentLoaded", function(event) {
         }
     }
 
-    function change(){
-        updateScore();
-        var newKeys = [];
-        for (let i = 0; i < score.length; i++){
-            var line = score[i];
-            if (activeKeys.includes(line.key)){
-                loops[line.key].notes = line.notes;
-                loops[line.key].newBeats = line.beats;
-            }
-            else{
-                loops[line.key] = new Loop(line);
-            }
-            newKeys.push(line.key);
-        }
-        for (let i=0; i < activeKeys.length; i++){
-            if (!newKeys.includes(activeKeys[i])){
-                loops[activeKeys[i]].notes = [];
-            }
-        }
-        activeKeys = newKeys;
-    }
-
     function stopPlaying(){
-        for (let i=0; i < activeKeys.length; i++){
-            loops[activeKeys[i]].del = true;
+        for (k in loops){
+            loops[k].delete = true;
         }
-        activeKeys = [];
-        score = [];
     }
 
     function scheduleNote(key){
         var loop = loops[key];
         var start = loop.lastNoteEnd;
         if (loop.nextNote > loop.notes.length - 1){
+            if (loop.newNotes.length > 0){
+                loop.notes = loop.newNotes;
+                loop.newNotes = [];
+            }
             loop.nextNote = 0;
         }
         var index = loop.nextNote;
@@ -133,8 +121,8 @@ document.addEventListener("DOMContentLoaded", function(event) {
         while (nextBeat < audioCtx.currentTime + 0.1) {
             nextBeat += beat;
             for (var key in loops){
-                if (loops[key].notes === null){
-                    loops.delete(key);
+                if (loops[key].delete === true){
+                    delete loops[key];
                     continue;
                 }
                 if (loops[key].lastNoteEnd === 0){
