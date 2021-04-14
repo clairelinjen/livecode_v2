@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", function(event) {
     function scheduleNote(key){
         var loop = loops[key];
         var start = loop.lastNoteEnd;
-        if (loop.nextNote >= loop.notes.length - 1){
+        if (loop.nextNote > loop.notes.length - 1){
             loop.nextNote = 0;
         }
         var index = loop.nextNote;
@@ -128,13 +128,10 @@ document.addEventListener("DOMContentLoaded", function(event) {
     }
 
     var nextBeat = audioCtx.currentTime;
-    console.log("bext beat "+nextBeat);
 
     function scheduler() {
-        console.log("time "+audioCtx.currentTime);
         while (nextBeat < audioCtx.currentTime + 0.1) {
             nextBeat += beat;
-            console.log("next beat "+nextBeat);
             for (var key in loops){
                 if (loops[key].notes === null){
                     loops.delete(key);
