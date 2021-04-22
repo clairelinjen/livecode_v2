@@ -8,6 +8,7 @@ class ReadLine {
         this.key = "";
         this.errors = [];
         this.arr = this.scan(line.split(""));
+        this.RNNcount = 0;
         if (this.errors.length === 0){
             this.setValues();
         }
@@ -87,6 +88,7 @@ class ReadLine {
         }
         else{
             this.notes = result[0];
+            console.log(this.notes)
             this.generate(0);
             // a 'note' is a length 2 array, note[0] is freq, note[1] is denominator of the fraction of the beat
             // [440, 2] means the note is 440 hz and lasts half a beat
@@ -111,8 +113,9 @@ class ReadLine {
                 } else {
                     var n = parseInt(curr);
                     if (isNaN(n) || n < 0 || n > 127) {
-                        if (curr === "x"){
-                            schedule.push(["x", 1]);
+                        if (curr === "x" || curr === "y"){
+                            schedule.push([[curr,this.RNNcount], 1]);
+                            this.RNNcount += 1;
                         }
                         else{
                             if (curr === "-"){
@@ -232,15 +235,30 @@ class ReadLine {
 
     generate(start){
         var lastGen = -1
+        var generated = {};
         for (let i=start; i < this.notes.length; i++){
-            if (this.notes[i][0]==="x"){
-                this.genNotes(this.notes.slice(0,i));
-                lastGen = i
+            var curr = this.notes[i][0];
+            if (this.errors.length === 0 && Array.isArray(curr)){
+                if (!(curr[1] in generated)){
+                    if (curr[0] === "x"){
+                        console.log("arg for x")
+                        console.log(this.notes.slice(0,i))
+                        this.genNotes(this.notes.slice(0,i), i, curr[1]);
+                    }
+                    else{
+                        console.log("last gen = "+lastGen.toString())
+                        console.log("arg for y")
+                        console.log(this.notes.slice(lastGen+1,i))
+                        this.genNotes(this.notes.slice(lastGen+1,i), i, curr[1]);
+                    }
+                    generated[curr[1]] = true;
+                }
+                lastGen = i;
             }
         }
     }
 
-    genNotes(notes) {
+    genNotes(notes, index, RNNid) {
 
         var fnotes = format(notes);
         const qns = mm.sequences.quantizeNoteSequence(fnotes, 1);
@@ -251,8 +269,13 @@ class ReadLine {
             .continueSequence(qns, rnn_steps, rnn_temperature)
             .then((sample) => {
                 var result = mm.sequences.unquantizeSequence(sample);
-                this.notes[notes.length][0] = result.notes[0].pitch;
-                this.generate(notes.length+1)
+                console.log(result)
+                this.notes[index][0] = result.notes[0].pitch;
+                var dupes = duplicates(this.notes, result.notes[0].pitch, RNNid);
+                for (let i=0; i<dupes.length; i++){
+                    this.notes[dupes[i]] = result.notes[0].pitch;
+                }
+                this.generate(index+1)
             })
     }
 }
@@ -267,4 +290,16 @@ function format(n) {
         st = end;
     }
     return {notes: steps, totalTime: end};
+}
+
+function duplicates(notes, pitch, RNNid){
+    var indices = [];
+    for (let i=0; i<notes.length; i++){
+        if (Array.isArray(notes[i][0])){
+            if (notes[i][0][1] === RNNid){
+                duplicateIndices.push(i)
+            }
+        }
+    }
+    return indices;
 }

@@ -90,6 +90,9 @@ document.addEventListener("DOMContentLoaded", function(event) {
     function scheduleNote(key){
         var loop = loops[key];
         var start = loop.lastNoteEnd;
+        if (loop.nextNote === 0){
+            console.log(loop.notes)
+        }
         if (loop.nextNote > loop.notes.length - 1){
             if (loop.newNotes.length > 0){
                 loop.notes = loop.newNotes;
