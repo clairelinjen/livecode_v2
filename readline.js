@@ -90,7 +90,6 @@ class ReadLine {
             this.generate(0);
             // a 'note' is a length 2 array, note[0] is freq, note[1] is denominator of the fraction of the beat
             // [440, 2] means the note is 440 hz and lasts half a beat
-            this.beats = result[1];
         }
     }
 
@@ -232,10 +231,11 @@ class ReadLine {
     }
 
     generate(start){
+        var lastGen = -1
         for (let i=start; i < this.notes.length; i++){
             if (this.notes[i][0]==="x"){
                 this.genNotes(this.notes.slice(0,i));
-                break;
+                lastGen = i
             }
         }
     }
