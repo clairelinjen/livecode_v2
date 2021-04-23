@@ -17,8 +17,6 @@ class ReadLine {
     scan(l){
         var temp = [];
         var arr = [];
-        var symbolcount = 0;
-        var notecount = 0;
 
         while (l.length > 0){
             var c = l.shift();
@@ -41,10 +39,12 @@ class ReadLine {
                     arr.push(temp.join(""));
                     temp = [];
                 }
+                else if (arr.length === 0){
+                  this.errors.push("Missing coefficient for star operator")
+                }
                 else{
                     arr[arr.length -1] = arr[arr.length -1].concat(c);
                 }
-                symbolcount += 1;
             }
             else if (c === " "){
                 if (temp.length > 0){
@@ -58,20 +58,9 @@ class ReadLine {
                     temp = [];
                 }
                 arr.push(c);
-                symbolcount += 1;
             }
             else{
                 temp.push(c);
-                notecount += 1;
-                if (c === '-'){
-                    notecount -= 1;
-                }
-                if(c === 'x'){
-                    if (notecount <= 1){
-                        this.errors.push("Number of notes before x must be greater than 1");
-                        break;
-                    }
-                }
             }
         }
         arr.push(temp.join(""));
@@ -83,7 +72,12 @@ class ReadLine {
 
     setValues(){
         var result = this.noteSchedule(this.arr);
+
         if (this.errors.length > 0){
+            this.key = "";
+        }
+        else if (result[0].length === 0){
+            this.errors.push("Empty loop");
             this.key = "";
         }
         else{
@@ -98,8 +92,7 @@ class ReadLine {
     noteSchedule(arr){
         var schedule = [];
         var beats = 0;
-
-        while (arr.length > 0){
+        while (arr.length > 0 && this.errors.length === 0){
             var curr = arr.shift();
             if (curr === ""){
                 //continue
@@ -122,7 +115,7 @@ class ReadLine {
                                 schedule.push([null, 1]);
                             }
                             else{
-                                this.errors.push("\'"+curr+"\' is undefined")
+                                this.errors.push(""+curr+" is undefined")
                                 break;
                             }
                         }
@@ -163,6 +156,9 @@ class ReadLine {
 
         var notes = [];
         curr = arr.shift();
+        if (curr.length === 0){
+            this.errors.push("Insufficient argument for star operator");
+        }
         if (curr === "(") {
             var g = this.group(arr);
             for (let i = 0; i < mult; i++) {
@@ -209,7 +205,7 @@ class ReadLine {
         var notes = [];
         var beats;
         if (arr.length === 0 && curr !== ")"){
-                // should throw an error
+            this.errors.push("missing )")
             beats = 0;
         }
         else{
@@ -229,6 +225,9 @@ class ReadLine {
             for (let i = 0; i < notes.length; i++){
                 notes[i][1] *= denom;
             }
+            if (notes.length === 0){
+                this.errors.push("Empty ()");
+            }
         }
         return [notes, beats, arr];
     }
@@ -241,15 +240,29 @@ class ReadLine {
             if (this.errors.length === 0 && Array.isArray(curr)){
                 if (!(curr[1] in generated)){
                     if (curr[0] === "x"){
+                        var x_arg = this.notes.slice(0,i)
+                        if (noteCount(x_arg)<2){
+                            this.errors.push("Insufficient argument for x");
+                            break;
+                        }
                         console.log("arg for x")
-                        console.log(this.notes.slice(0,i))
-                        this.genNotes(this.notes.slice(0,i), i, curr[1]);
+                        console.log(x_arg)
+                        this.genNotes(x_arg, i, curr[1]);
                     }
                     else{
                         console.log("last gen = "+lastGen.toString())
                         console.log("arg for y")
-                        console.log(this.notes.slice(lastGen+1,i))
-                        this.genNotes(this.notes.slice(lastGen+1,i), i, curr[1]);
+                        if (lastGen === -1) {
+                            this.errors.push("No RNN operator in argument of y");
+                            break;
+                        }
+                        var y_arg = this.notes.slice(lastGen+1,i)
+                        console.log(y_arg)
+                        if (noteCount(y_arg) < 2){
+                            this.errors.push("Insufficient argument for y");
+                            break;
+                        }
+                        this.genNotes(y_arg, i, curr[1]);
                     }
                     generated[curr[1]] = true;
                 }
@@ -302,4 +315,15 @@ function duplicates(notes, pitch, RNNid){
         }
     }
     return indices;
+}
+
+function noteCount(noteList){
+    var count = 0;
+    for (let i=0; i<noteList.length; i++){
+        var curr = noteList[i][0];
+        if (!(curr === null)){
+            count += 1;
+        }
+    }
+    return count;
 }
